@@ -1,0 +1,29 @@
+[
+  {
+    "projectType": "커머스",
+    "category": "B2C 웹 서비스",
+    "summary": "상품 검색과 주문을 제공하는 반응형 커머스 서비스",
+    "workDays": 28,
+    "estimate": 11200000,
+    "platform": "fullstack",
+    "techStack": ["Next.js", "TypeScript", "PostgreSQL"]
+  },
+  {
+    "projectType": "업무 자동화",
+    "category": "내부 운영 도구",
+    "summary": "반복적인 문서 검토와 승인 흐름을 자동화하는 관리자 서비스",
+    "workDays": 20,
+    "estimate": 8000000,
+    "platform": "fullstack",
+    "techStack": ["Next.js", "TypeScript", "PostgreSQL"]
+  },
+  {
+    "projectType": "모바일 앱",
+    "category": "예약 서비스",
+    "summary": "고객 예약과 운영자 일정 관리를 제공하는 모바일 서비스",
+    "workDays": 36,
+    "estimate": 14400000,
+    "platform": "mobile",
+    "techStack": ["React Native", "TypeScript", "Node.js"]
+  }
+]
