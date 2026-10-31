@@ -38,6 +38,9 @@ export interface IntegratedQuote {
   contingencyCost: number;
   totalCost: number;
   currency: "KRW";
+  summary: string;
+  overlaps: string[];
+  recommendations: string[];
   assumptions: string[];
   risks: string[];
 }

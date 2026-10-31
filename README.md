@@ -32,9 +32,9 @@
 | `uiux-cost-estimator` | RFP JSON | `02_uiux.json` | 화면, 사용자 흐름, UI/UX 작업 범위와 비용 산출 |
 | `architecture-cost-estimator` | RFP JSON | `03_architecture.json` | 시스템 구조, 인프라, 기술 설계 범위와 비용 산출 |
 | `implementation-cost-estimator` | RFP JSON | `04_implementation.json` | 개발·QA·배포 작업 범위와 비용 산출 |
-| `quote-integrator` | 세 영역의 견적 JSON | `05_integrated_quote.json` | 영역별 결과를 검증·합산하고 통합 견적 생성 |
+| `quote-integrator` | 세 영역의 견적 JSON과 계산 결과 | `05_integrated_quote.json` | 중복 범위·리스크·통합 설명 생성 |
 
-`quote-orchestrator`는 전체 실행을 관리하는 중앙 오케스트레이터입니다. RFP 분석 이후 세 견적 에이전트를 병렬 실행하고, 모든 결과가 준비되면 `quote-integrator`를 호출합니다.
+`quote-orchestrator`는 전체 실행을 관리하는 중앙 오케스트레이터입니다. RFP 분석 이후 세 견적 에이전트를 병렬 실행하고, TypeScript로 금액·작업일수를 먼저 계산한 뒤 `quote-integrator`를 호출합니다. 통합 Agent는 계산값을 수정하지 않고 중복 범위, 리스크, 요약과 권고사항만 생성합니다.
 
 모델은 단순히 가장 저렴한 모델로 고정하지 않습니다. 작업 복잡도와 품질 요구사항을 기준으로 선택하며, 모델 교체와 비용 비교가 가능하도록 구성합니다.
 
@@ -68,7 +68,7 @@
 }
 ```
 
-구조화된 결과를 기준으로 통합 견적을 계산하므로, Markdown 문장 파싱에 의존하지 않습니다.
+구조화된 결과를 기준으로 통합 견적을 계산하므로, Markdown 문장 파싱에 의존하지 않습니다. 금액·작업일수 합산은 결정적인 TypeScript 코드가 담당하고, Agent는 설명과 검토 의견을 담당합니다.
 
 ## 처리 워크플로
 

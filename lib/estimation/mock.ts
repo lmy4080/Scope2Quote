@@ -74,6 +74,9 @@ export function integrateEstimates(estimates: CategoryEstimate[], rfp: Rfp): Int
     contingencyCost,
     totalCost: estimatedCost + contingencyCost,
     currency: "KRW",
+    summary: "세부 견적을 합산한 Mock 통합 견적입니다.",
+    overlaps: [],
+    recommendations: ["RFP 확정 후 화면 수와 외부 연동 범위를 다시 검토하세요."],
     assumptions: rfp.assumptions,
     risks: [...rfp.risks, "통합 견적에는 변경 가능성을 고려한 10% 예비비가 포함된다."],
   };

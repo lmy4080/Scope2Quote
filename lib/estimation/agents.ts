@@ -26,10 +26,22 @@ const estimateSchema = z.object({
   risks: z.array(z.string()),
 });
 
+const integrationSchema = z.object({
+  summary: z.string(),
+  overlaps: z.array(z.string()),
+  recommendations: z.array(z.string()),
+});
+
 const rfpAgent = new Agent({
   name: "rfp-analyzer",
   instructions: "고객 요구사항을 분석해 구조화된 RFP를 생성한다. 추측은 assumptions와 risks에 명시한다.",
   outputType: rfpSchema,
+});
+
+const quoteIntegrator = new Agent({
+  name: "quote-integrator",
+  instructions: "세부 견적과 계산된 통합 금액을 검토해 중복 범위, 리스크, 고객에게 전달할 요약과 권고사항을 작성한다. 금액과 작업일수는 수정하지 않는다.",
+  outputType: integrationSchema,
 });
 
 const estimatorDefinitions = [
@@ -72,11 +84,20 @@ export async function runAgentsEstimate(input: EstimateRequest): Promise<Estimat
     return { ...output, category: definition.category, label: definition.label } as CategoryEstimate;
   }));
 
+  const calculatedQuote = integrateEstimates(estimates, rfp);
+  const integrationResult = await run(quoteIntegrator, JSON.stringify({
+    rfp,
+    estimates,
+    calculatedQuote,
+  }));
+  const integration = integrationResult.finalOutput;
+  if (!integration) throw new Error("quote-integrator가 결과를 반환하지 않았습니다.");
+
   return {
     runId: `agents-${Date.now()}`,
     mode: "agents",
     rfp,
     estimates,
-    integratedQuote: integrateEstimates(estimates, rfp),
+    integratedQuote: { ...calculatedQuote, ...integration },
   };
 }

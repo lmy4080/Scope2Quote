@@ -95,6 +95,10 @@ export default function HomePage() {
                     </Box>
                   </Stack>
                   <Typography color="text.secondary" variant="body2">예비비 포함 · 실행 ID: {result.runId}</Typography>
+                  <Typography>{result.integratedQuote.summary}</Typography>
+                  {result.integratedQuote.recommendations.map((recommendation) => (
+                    <Typography key={recommendation} color="text.secondary" variant="body2">권고: {recommendation}</Typography>
+                  ))}
                 </Stack>
               </CardContent>
             </Card>
