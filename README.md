@@ -141,8 +141,8 @@ OpenAI Agents SDK 오케스트레이터
 
 - `load_project_examples`: 과거 프로젝트 Mock 데이터 조회
 - `read_rfp`: 구조화된 RFP 조회
-- `save_estimate`: 검증된 견적 결과 저장
 - `list_attachments`: 입력 첨부파일 목록 조회
+- `read_estimate_inputs`: 통합 검토용 RFP·세부 견적·계산 결과 조회
 
 파일 경로와 저장 위치는 워크스페이스 내부로 제한하며, 임의의 명령 실행이나 외부 파일 접근은 허용하지 않습니다.
 

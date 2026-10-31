@@ -1,5 +1,6 @@
-import { Agent, run } from "@openai/agents";
+import { Agent, run, tool } from "@openai/agents";
 import { z } from "zod";
+import projectExamples from "@/data/projects.json";
 import { integrateEstimates } from "./mock";
 import type { CategoryEstimate, EstimateRequest, EstimateRun, Rfp } from "./types";
 
@@ -32,17 +33,79 @@ const integrationSchema = z.object({
   recommendations: z.array(z.string()),
 });
 
-const rfpAgent = new Agent({
-  name: "rfp-analyzer",
-  instructions: "고객 요구사항을 분석해 구조화된 RFP를 생성한다. 추측은 assumptions와 risks에 명시한다.",
-  outputType: rfpSchema,
-});
+function createProjectExamplesTool() {
+  return tool({
+    name: "load_project_examples",
+    description: "플랫폼 조건에 맞는 과거 프로젝트와 견적 데이터를 조회한다.",
+    parameters: z.object({ platform: z.string().optional() }),
+    async execute({ platform }) {
+      const examples = platform
+        ? projectExamples.filter((project) => project.platform === platform)
+        : projectExamples;
+      return JSON.stringify(examples);
+    },
+  });
+}
 
-const quoteIntegrator = new Agent({
-  name: "quote-integrator",
-  instructions: "세부 견적과 계산된 통합 금액을 검토해 중복 범위, 리스크, 고객에게 전달할 요약과 권고사항을 작성한다. 금액과 작업일수는 수정하지 않는다.",
-  outputType: integrationSchema,
-});
+function createAttachmentListTool(attachmentNames: string[]) {
+  return tool({
+    name: "list_attachments",
+    description: "이번 견적 요청에 포함된 첨부파일 목록을 조회한다.",
+    parameters: z.object({}),
+    async execute() {
+      return JSON.stringify({ attachmentNames });
+    },
+  });
+}
+
+function createReadRfpTool(rfp: Rfp) {
+  return tool({
+    name: "read_rfp",
+    description: "이번 견적 실행에서 확정된 구조화 RFP를 조회한다.",
+    parameters: z.object({}),
+    async execute() {
+      return JSON.stringify(rfp);
+    },
+  });
+}
+
+function createReadEstimateInputsTool(rfp: Rfp, estimates: CategoryEstimate[], calculatedQuote: ReturnType<typeof integrateEstimates>) {
+  return tool({
+    name: "read_estimate_inputs",
+    description: "통합 검토를 위한 RFP, 세부 견적, 결정론적 계산 결과를 조회한다.",
+    parameters: z.object({}),
+    async execute() {
+      return JSON.stringify({ rfp, estimates, calculatedQuote });
+    },
+  });
+}
+
+function createRfpAgent(attachmentNames: string[]) {
+  return new Agent({
+    name: "rfp-analyzer",
+    instructions: "고객 요구사항을 분석해 구조화된 RFP를 생성한다. 반드시 list_attachments와 load_project_examples를 사용하고, 추측은 assumptions와 risks에 명시한다.",
+    tools: [createAttachmentListTool(attachmentNames), createProjectExamplesTool()],
+    outputType: rfpSchema,
+  });
+}
+
+function createEstimatorAgent(definition: (typeof estimatorDefinitions)[number], rfp: Rfp) {
+  return new Agent({
+    name: `${definition.label}-cost-estimator`,
+    instructions: `반드시 read_rfp와 load_project_examples를 사용해 RFP와 유사 프로젝트를 확인한 뒤 ${definition.focus} 작업의 견적을 산출한다. 작업일수와 금액의 근거를 tasks에 작성하고, 불확실성은 assumptions와 risks에 기록한다.`,
+    tools: [createReadRfpTool(rfp), createProjectExamplesTool()],
+    outputType: estimateSchema,
+  });
+}
+
+function createQuoteIntegrator(rfp: Rfp, estimates: CategoryEstimate[], calculatedQuote: ReturnType<typeof integrateEstimates>) {
+  return new Agent({
+    name: "quote-integrator",
+    instructions: "반드시 read_estimate_inputs를 사용해 입력을 확인한 뒤 세부 견적과 계산된 통합 금액을 검토한다. 금액과 작업일수는 수정하지 않고 중복 범위, 리스크, 고객에게 전달할 요약과 권고사항만 작성한다.",
+    tools: [createReadEstimateInputsTool(rfp, estimates, calculatedQuote)],
+    outputType: integrationSchema,
+  });
+}
 
 const estimatorDefinitions = [
   {
@@ -62,22 +125,16 @@ const estimatorDefinitions = [
   },
 ];
 
-function createEstimator(label: string, focus: string) {
-  return new Agent({
-    name: `${label}-cost-estimator`,
-    instructions: `RFP JSON을 바탕으로 ${focus} 작업의 견적을 산출한다. 작업일수와 금액의 근거를 tasks에 작성하고, 불확실성은 assumptions와 risks에 기록한다.`,
-    outputType: estimateSchema,
-  });
-}
-
 export async function runAgentsEstimate(input: EstimateRequest): Promise<EstimateRun> {
-  const rfpResult = await run(rfpAgent, JSON.stringify({ request: input.request, attachmentNames: input.attachmentNames ?? [] }));
+  const rfpResult = await run(
+    createRfpAgent(input.attachmentNames ?? []),
+    JSON.stringify({ request: input.request }),
+  );
   const rfp = rfpResult.finalOutput as Rfp | undefined;
   if (!rfp) throw new Error("RFP agent가 결과를 반환하지 않았습니다.");
 
   const estimates = await Promise.all(estimatorDefinitions.map(async (definition) => {
-    const agent = createEstimator(definition.label, definition.focus);
-    const result = await run(agent, JSON.stringify({ rfp }));
+    const result = await run(createEstimatorAgent(definition, rfp), JSON.stringify({ category: definition.category }));
     const output = result.finalOutput;
     if (!output) throw new Error(`${definition.label} 에이전트가 결과를 반환하지 않았습니다.`);
 
@@ -85,11 +142,10 @@ export async function runAgentsEstimate(input: EstimateRequest): Promise<Estimat
   }));
 
   const calculatedQuote = integrateEstimates(estimates, rfp);
-  const integrationResult = await run(quoteIntegrator, JSON.stringify({
-    rfp,
-    estimates,
-    calculatedQuote,
-  }));
+  const integrationResult = await run(
+    createQuoteIntegrator(rfp, estimates, calculatedQuote),
+    "통합 견적을 검토해 주세요.",
+  );
   const integration = integrationResult.finalOutput;
   if (!integration) throw new Error("quote-integrator가 결과를 반환하지 않았습니다.");
 
